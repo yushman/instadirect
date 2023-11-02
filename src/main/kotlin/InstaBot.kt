@@ -63,6 +63,7 @@ internal class InstaBot(
     }
 
     private fun String.replaceHost(): String{
+        if (this.isEmpty()) return Templates.Empty
         val result = this.replaceFirst("instagram", "ddinstagram")
         return "[$result]($result)"
     }
