@@ -6,11 +6,16 @@ import com.github.kotlintelegrambot.dispatcher.text
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.ParseMode
 import kotlinx.datetime.Clock
+import mutator.InstaRegexpParser
+import mutator.MediumRegexpParser
+import mutator.XcomRegexpParser
 
 internal class InstaBot(
     private val botToken: String
 ) {
-    private val regexpParser = RegexpParser()
+    private val instaRegexpParser = InstaRegexpParser()
+    private val xcomRegexpParser = XcomRegexpParser()
+    private val mediumRegexpParser = MediumRegexpParser()
 
     fun start(){
         val bot = bot {
@@ -22,10 +27,9 @@ internal class InstaBot(
                 text {
                     val result = text
                         .log(message.from?.username.orEmpty(), message.from?.id)
-                        .getUrl {
+                        .replaceLink {
                             bot.send(it, message.chat.id)
                         }
-                        .replaceHost()
 
                     if (result.isNotEmpty()) {
                         println(result)
@@ -43,13 +47,19 @@ internal class InstaBot(
         if (text.isNotEmpty()) this.sendMessage(ChatId.fromId(id), text = text, parseMode = ParseMode.MARKDOWN)
     }
 
-    private fun String.getUrl(onError: (String) -> Unit): String {
+    private fun String.replaceLink(onError: (String) -> Unit): String {
         if (this.isCommand()) return Templates.Empty
-        val result = regexpParser.parseInstaLink(this)
-        if (result.isEmpty()) {
+        val instaLink = instaRegexpParser.findLink(this)
+        val xcomLink = xcomRegexpParser.findLink(this)
+        val mediumLink = mediumRegexpParser.findLink(this)
+        val result = instaLink?.let{ instaRegexpParser.mutate(it) }
+            ?: xcomLink?.let{ xcomRegexpParser.mutate(it) }
+            ?: mediumLink?.let{ mediumRegexpParser.mutate(it)}
+
+        if (result.isNullOrEmpty()) {
             onError(Templates.noInstalink)
         }
-        return result
+        return result ?: Templates.Empty
     }
 
     private fun String.isCommand(): Boolean {
@@ -60,11 +70,5 @@ internal class InstaBot(
         val time = Clock.System.now().toString()
         if (this.isNotEmpty()) println("$time: message $this from $name with id $id")
         return this
-    }
-
-    private fun String.replaceHost(): String{
-        if (this.isEmpty()) return Templates.Empty
-        val result = this.replaceFirst("instagram", "ddinstagram")
-        return "[$result]($result)"
     }
 }
